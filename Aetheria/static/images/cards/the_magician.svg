@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300">
+  <rect width="200" height="300" rx="12" fill="#f9fff4"/>
+  <g fill="#a9ffb8">
+    <rect x="40" y="60" width="120" height="40" rx="8" />
+  </g>
+  <text x="100" y="260" font-family="sans-serif" font-size="18" text-anchor="middle" fill="#333">The Magician</text>
+</svg>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Aetheria</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+  <h1>Aetheria</h1>
+
+      <section class="crystals">
+        <h2>Choose your inspiration crystal</h2>
+        <div id="crystalList" class="grid"></div>
+      </section>
+
+      <section class="crystal-ball">
+        <h2>The Dreamy Crystal Ball</h2>
+        <div id="crystalBall" class="ball">
+          <div class="glow"></div>
+          <div class="inner-sphere">🔮</div>
+        </div>
+        <p class="muted">Focus on an intention, then choose to generate a visual card from Stable Diffusion or a placeholder art.</p>
+      </section>
+
+      <section class="reading">
+        <h2>Choose a card reading</h2>
+        <div class="controls">
+          <select id="readingSelect">
+            <option value="single">Single Card</option>
+            <option value="three">Three Card</option>
+            <option value="five">Five Card</option>
+          </select>
+          <button id="drawBtn">Draw</button>
+        </div>
+
+        <div id="readingResult" class="cards"></div>
+        <div class="generate-area">
+          <label for="promptInput">Visual prompt (optional)</label>
+          <input id="promptInput" placeholder="a dreamlike forest, soft pastel light..." />
+          <button id="generateBtn">Generate Card Image</button>
+          <div id="generatedPreview" class="generated-preview"></div>
+        </div>
+      </section>
+
+      <section class="chat">
+        <h2>Chat with the Fortune Teller</h2>
+        <div id="chatLog" class="chat-log"></div>
+        <div id="typingIndicator" class="typing" aria-hidden="true">The fortune teller is composing...</div>
+        <form id="chatForm">
+          <input id="chatInput" placeholder="Ask a question..." autocomplete="off" />
+          <button>Send</button>
+        </form>
+      </section>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

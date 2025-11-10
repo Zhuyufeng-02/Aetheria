@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 300">
+  <rect width="200" height="300" rx="12" fill="#f6f7ff"/>
+  <g fill="#c6c9ff">
+    <ellipse cx="100" cy="110" rx="48" ry="28" />
+  </g>
+  <text x="100" y="260" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#333">The High Priestess</text>
+</svg>

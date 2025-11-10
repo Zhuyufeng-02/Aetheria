@@ -1,0 +1,54 @@
+
+body{font-family: system-ui, -apple-system,Segoe UI, Roboto, 'Helvetica Neue', Arial; background:#fffaf0; color:#222}
+.container{max-width:960px;margin:36px auto;padding:24px;background:#fff;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.08)}
+h1{margin-top:0}
+.grid{display:flex;gap:12px;flex-wrap:wrap}
+.pulse{animation: pulse 1.6s infinite ease-in-out}
+@keyframes pulse{0%{transform:translateY(0)}50%{transform:translateY(-4px)}100%{transform:translateY(0)}}
+.crystal{border:0;padding:8px 12px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 6px 18px rgba(0,0,0,.04);background:transparent}
+.crystal svg{width:28px;height:28px}
+.crystal .label{font-weight:600}
+.crystal.selected{outline:3px solid rgba(92,108,255,.14);transform:translateY(-4px)}
+.crystal:hover{transform:translateY(-2px)}
+
+.controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+
+.cards{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap}
+.card{background:transparent;padding:0;border-radius:10px;min-width:160px;perspective:1000px}
+.card .inner{width:160px;height:240px;transform-style:preserve-3d;transition:transform 700ms cubic-bezier(.2,.9,.3,1);position:relative}
+.card.flipped .inner{transform:rotateY(180deg)}
+.card .face{position:absolute;inset:0;border-radius:10px;backface-visibility:hidden;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:12px}
+.card .face.front{background:#fff7f0;border:1px solid rgba(0,0,0,.04);transform:rotateY(180deg)}
+.card .face.front h3{margin:0 0 6px 0;font-size:16px}
+.card .face.front p{margin:0;font-size:13px;color:#333}
+.card .face.back{background:#f6f8ff;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.06)}
+.card .face.back img{width:100%;height:100%;object-fit:cover}
+
+.chat-log{height:220px;overflow:auto;border:1px solid rgba(0,0,0,.06);padding:8px;border-radius:6px;background:#fff}
+.chat-item{margin:6px 0;padding:8px;border-radius:6px}
+.chat-item.user{text-align:right;background:#e6f7ff}
+.chat-item.bot{text-align:left;background:#fff3e6}
+.chat-item.user{margin-left:20%}
+.chat-item.bot{margin-right:20%}
+.chat-item.system{background:#f3f5ff;text-align:center}
+.typing{margin:6px 0;padding:8px;color:#666;font-style:italic}
+
+select,input{padding:8px;border-radius:6px;border:1px solid rgba(0,0,0,.08)}
+button{padding:8px 12px;border-radius:6px;border:0;background:#5c6cff;color:#fff}
+
+@media (max-width:640px){
+	.cards{justify-content:center}
+	.card .inner{width:140px;height:210px}
+}
+
+.crystal-ball{margin:18px 0;padding:12px;border-radius:12px;background:linear-gradient(180deg, rgba(250,250,255,0.6), rgba(245,243,255,0.4));box-shadow:0 8px 30px rgba(100,80,150,.06)}
+.ball{width:160px;height:160px;border-radius:50%;margin:12px auto;position:relative;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(200,180,255,0.18));display:flex;align-items:center;justify-content:center}
+.ball .glow{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 40px rgba(138,199,255,.18),0 0 80px rgba(92,108,255,.06);pointer-events:none}
+.ball .inner-sphere{font-size:42px}
+.muted{color:#666;font-size:13px;text-align:center}
+
+.generate-area{margin-top:16px;display:flex;gap:8px;align-items:flex-start}
+.generate-area input{flex:1}
+.generated-preview{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap}
+.generated-preview img{width:160px;height:240px;border-radius:10px;object-fit:cover;box-shadow:0 12px 30px rgba(50,30,80,.08)}
+
