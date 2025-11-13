@@ -144,14 +144,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json()
       const prev = document.getElementById('generatedPreview')
       prev.innerHTML = ''
-      const img = document.createElement('img')
-      img.src = data.image
-      img.alt = 'Generated card'
-      prev.appendChild(img)
-      // allow user to click generated image to interpret/chat
-      img.addEventListener('click', ()=>{
-        appendChat('system','You selected the generated card for interpretation.')
-        sendChat('Interpret this card: ' + (data.prompt||'visual')).then(()=>{})
+      // handle multiple images if returned
+      const images = data.images || (data.image? [{url: data.image}]: [])
+      if(images.length === 0){
+        appendChat('system','No image returned; using placeholder.')
+      }
+      images.forEach((it, i) => {
+        const img = document.createElement('img')
+        img.src = it.url
+        img.alt = 'Generated card'
+        prev.appendChild(img)
+        img.addEventListener('click', ()=>{
+          showModal(it.url, data.prompt || '', null)
+        })
       })
     }catch(e){
       appendChat('system','Generation failed. Using a placeholder.')
@@ -161,6 +166,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
 
+
+// Modal to show large generated image with interpretation controls
+function showModal(imageUrl, prompt, id){
+  // create overlay
+  let overlay = document.createElement('div')
+  overlay.className = 'modal-overlay'
+  overlay.innerHTML = `
+    <div class="modal">
+      <button class="modal-close" aria-label="Close">✕</button>
+      <div class="modal-body">
+        <img src="${imageUrl}" alt="generated" class="modal-image" />
+        <div class="modal-meta">
+          <div class="modal-prompt">${prompt || ''}</div>
+          <div class="modal-actions">
+            <button class="modal-interpret">Interpret</button>
+            ${id? `<button class="modal-delete">Delete</button>`: ''}
+          </div>
+          <div class="modal-interpretation"></div>
+        </div>
+      </div>
+    </div>`
+
+  document.body.appendChild(overlay)
+
+  const close = overlay.querySelector('.modal-close')
+  close.onclick = ()=> overlay.remove()
+
+  overlay.onclick = (e)=>{ if(e.target === overlay) overlay.remove() }
+
+  const interpretBtn = overlay.querySelector('.modal-interpret')
+  const interpOut = overlay.querySelector('.modal-interpretation')
+  interpretBtn.onclick = async ()=>{
+    interpOut.textContent = 'Thinking...'
+    try{
+      const res = await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:'Interpret this card: '+(prompt||''), crystal: null})})
+      const j = await res.json()
+      interpOut.textContent = j.reply || 'No reply.'
+    }catch(e){ interpOut.textContent = 'Failed to interpret.' }
+  }
+
+  const delBtn = overlay.querySelector('.modal-delete')
+  if(delBtn){
+    delBtn.onclick = async ()=>{
+      if(!confirm('Delete this generated image?')) return
+      const r = await fetch('/api/generated/'+id, {method:'DELETE'})
+      if(r.ok){ overlay.remove(); location.reload() }
+      else alert('Delete failed')
+    }
+  }
+}
+
+window.showModal = showModal
   const form = document.getElementById('chatForm')
   form.addEventListener('submit', (e) => {
     e.preventDefault()

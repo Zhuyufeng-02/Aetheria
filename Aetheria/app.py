@@ -1,6 +1,8 @@
 import os
 import random
 from flask import Flask, render_template, jsonify, request
+import sqlite3
+from datetime import datetime
 
 try:
     import openai
@@ -10,6 +12,26 @@ except Exception:
 
 def create_app():
     app = Flask(__name__, template_folder='templates', static_folder='static')
+    # Database path for generated image metadata
+    app.config.setdefault('DATABASE', os.path.join(app.root_path, 'generated.db'))
+
+    def init_db():
+        db_path = app.config['DATABASE']
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS generated (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                prompt TEXT,
+                crystal TEXT,
+                created_at TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    init_db()
 
     # Minimal in-memory deck (major arcana subset for demo)
     DECK = [
@@ -64,6 +86,50 @@ def create_app():
             'message': f'A {reading} card reading using {crystal or "your chosen crystal"}.'
         }
         return jsonify(response)
+
+
+    @app.route('/generated')
+    def gallery():
+        return render_template('generated.html')
+
+
+    @app.route('/api/generated', methods=['GET'])
+    def list_generated():
+        # return list of generated images from DB
+        db_path = app.config['DATABASE']
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('SELECT id, filename, prompt, crystal, created_at FROM generated ORDER BY id DESC')
+        rows = c.fetchall()
+        conn.close()
+        items = []
+        for r in rows:
+            items.append({'id': r[0], 'image': '/static/generated/' + r[1], 'prompt': r[2], 'crystal': r[3], 'created_at': r[4]})
+        return jsonify({'items': items})
+
+
+    @app.route('/api/generated/<int:gid>', methods=['DELETE'])
+    def delete_generated(gid):
+        db_path = app.config['DATABASE']
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('SELECT filename FROM generated WHERE id=?', (gid,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return jsonify({'error': 'not found'}), 404
+        filename = row[0]
+        c.execute('DELETE FROM generated WHERE id=?', (gid,))
+        conn.commit()
+        conn.close()
+        # remove file
+        path = os.path.join(app.static_folder, 'generated', filename)
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+        return jsonify({'deleted': gid})
 
 
     @app.route('/api/chat', methods=['POST'])
@@ -124,6 +190,7 @@ def create_app():
         """
         data = request.json or {}
         prompt = data.get('prompt', '')
+        prompts = data.get('prompts')
         crystal = data.get('crystal')
 
         use_sd = os.environ.get('USE_SD', 'false').lower() == 'true'
@@ -141,40 +208,294 @@ def create_app():
             out_path = os.path.join(app.static_folder, 'generated', fname)
             with open(out_path, 'wb') as f:
                 f.write(data)
+            # insert metadata into DB
+            try:
+                conn = sqlite3.connect(app.config['DATABASE'])
+                c = conn.cursor()
+                c.execute('INSERT INTO generated (filename, prompt, crystal, created_at) VALUES (?,?,?,?)',
+                          (fname, prompt, crystal, datetime.utcnow().isoformat()))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
             return f'/static/generated/{fname}'
+
+        def save_debug_response(obj, prefix='sd_debug'):
+            """Save SD response (JSON or text) to static/sd_debug and return the public path."""
+            import json, uuid
+            try:
+                debug_dir = os.path.join(app.static_folder, 'sd_debug')
+                os.makedirs(debug_dir, exist_ok=True)
+                fname = f"{prefix}-{uuid.uuid4().hex[:10]}.json"
+                out_path = os.path.join(debug_dir, fname)
+                # try to dump JSON nicely, fall back to str()
+                try:
+                    with open(out_path, 'w', encoding='utf-8') as f:
+                        json.dump(obj, f, indent=2, ensure_ascii=False)
+                except Exception:
+                    with open(out_path, 'w', encoding='utf-8') as f:
+                        f.write(str(obj))
+                return f'/static/sd_debug/{fname}'
+            except Exception:
+                return None
 
         # If use_sd, attempt to call local SD API and save returned base64 images
         if use_sd:
             sd_url = os.environ.get('LOCAL_SD_URL', 'http://127.0.0.1:7860/sdapi/v1/txt2img')
             try:
                 import requests
-                payload = { 'prompt': prompt }
-                r = requests.post(sd_url, json=payload, timeout=30)
+                # helper: recursively search JSON-like structure for base64 image strings
+                def extract_base64_images(node):
+                    found = []
+                    if node is None:
+                        return found
+                    if isinstance(node, str):
+                        s = node.strip()
+                        if s.startswith('data:image') and 'base64,' in s:
+                            found.append(s)
+                            return found
+                        if len(s) > 800 and all(c.isalnum() or c in '+/=' for c in s[:200]):
+                            found.append(s)
+                            return found
+                        return found
+                    if isinstance(node, dict):
+                        for k in ('images', 'image', 'result', 'outputs', 'artifacts', 'images_base64'):
+                            if k in node:
+                                return extract_base64_images(node[k])
+                        for v in node.values():
+                            found.extend(extract_base64_images(v))
+                        return found
+                    if isinstance(node, list):
+                        for item in node:
+                            found.extend(extract_base64_images(item))
+                        return found
+                    return found
+
+                # helper to extract metadata (seed/steps/sampler) from response
+                def extract_metadata(node):
+                    md = {}
+                    if not node:
+                        return md
+                    if isinstance(node, dict):
+                        for k in ('seed', 'steps', 'sampler', 'sampler_name', 'seed_value', 'cfg_scale'):
+                            if k in node:
+                                md[k] = node[k]
+                        for v in node.values():
+                            if isinstance(v, (dict, list)):
+                                nested = extract_metadata(v)
+                                for kk, vv in nested.items():
+                                    if kk not in md:
+                                        md[kk] = vv
+                    elif isinstance(node, list):
+                        for item in node:
+                            nested = extract_metadata(item)
+                            for kk, vv in nested.items():
+                                if kk not in md:
+                                    md[kk] = vv
+                    return md
+
+                # If a batch of prompts is provided, handle them sequentially and return array of urls
+                if prompts and isinstance(prompts, list):
+                    results = []
+                    # prepare headers once
+                    headers = {'Content-Type': 'application/json'}
+                    local_key = os.environ.get('LOCAL_SD_KEY')
+                    key_header = os.environ.get('LOCAL_SD_KEY_HEADER', 'Authorization')
+                    if local_key:
+                        if key_header.lower() == 'authorization' and not local_key.lower().startswith('bearer '):
+                            headers[key_header] = f'Bearer {local_key}'
+                        else:
+                            headers[key_header] = local_key
+
+                    # common payload parameters
+                    width = int(data.get('width', 512))
+                    height = int(data.get('height', 768))
+                    steps = int(data.get('steps', 20))
+                    sampler = data.get('sampler', None)
+                    cfg_scale = float(data.get('cfg_scale', 7.0))
+                    samples = int(data.get('samples', 1))
+                    seed = data.get('seed', None)
+                    negative = data.get('negative_prompt', None)
+
+                    for p in prompts:
+                        payload = {
+                            'prompt': p,
+                            'width': width,
+                            'height': height,
+                            'steps': steps,
+                            'cfg_scale': cfg_scale,
+                            'samples': samples,
+                        }
+                        if sampler:
+                            payload['sampler_name'] = sampler
+                        if seed is not None:
+                            try:
+                                payload['seed'] = int(seed)
+                            except Exception:
+                                payload['seed'] = seed
+                        if negative:
+                            payload['negative_prompt'] = negative
+
+                        try:
+                            r = requests.post(sd_url, json=payload, timeout=60, headers=headers)
+                        except Exception as e:
+                            results.append({'error': str(e)})
+                            continue
+                        if r.status_code != 200:
+                            results.append({'error': f'sd_status_{r.status_code}', 'body': r.text})
+                            continue
+                        try:
+                            j = r.json()
+                        except Exception:
+                            j = {'raw_text': r.text}
+                        images = extract_base64_images(j)
+                        if not images:
+                            dbg = save_debug_response(j) if data.get('debug') else None
+                            results.append({'error': 'no_images', 'sd_body': j, 'sd_debug_file': dbg})
+                            continue
+                        # save first image for this prompt
+                        url = save_base64_image(images[0], prefix='sd')
+                        results.append({'prompt': p, 'image': url, 'meta': extract_metadata(j)})
+                    return jsonify({'results': results, 'prompt_batch': len(prompts)})
+                # Build a richer payload for common SD REST endpoints (txt2img style).
+                # Accept optional parameters from the incoming request to override defaults.
+                width = int(data.get('width', 512))
+                height = int(data.get('height', 768))
+                steps = int(data.get('steps', 20))
+                sampler = data.get('sampler', None)
+                cfg_scale = float(data.get('cfg_scale', 7.0))
+                samples = int(data.get('samples', 1))
+                seed = data.get('seed', None)
+                negative = data.get('negative_prompt', None)
+
+                payload = {
+                    'prompt': prompt,
+                    'width': width,
+                    'height': height,
+                    'steps': steps,
+                    'cfg_scale': cfg_scale,
+                    'samples': samples,
+                }
+                if sampler:
+                    payload['sampler_name'] = sampler
+                if seed is not None:
+                    try:
+                        payload['seed'] = int(seed)
+                    except Exception:
+                        payload['seed'] = seed
+                if negative:
+                    payload['negative_prompt'] = negative
+                # support an optional local SD API key (set LOCAL_SD_KEY) and header name (LOCAL_SD_KEY_HEADER)
+                headers = {'Content-Type': 'application/json'}
+                local_key = os.environ.get('LOCAL_SD_KEY')
+                key_header = os.environ.get('LOCAL_SD_KEY_HEADER', 'Authorization')
+                if local_key:
+                    # if header is Authorization and key doesn't already start with Bearer, add prefix
+                    if key_header.lower() == 'authorization' and not local_key.lower().startswith('bearer '):
+                        headers[key_header] = f'Bearer {local_key}'
+                    else:
+                        headers[key_header] = local_key
+
+                r = requests.post(sd_url, json=payload, timeout=30, headers=headers)
                 debug = data.get('debug', False)
                 if r.status_code == 200:
                     try:
                         j = r.json()
                     except Exception:
                         j = {'raw_text': r.text}
-                    # Many SD web UIs return 'images' array of base64 strings
-                    images = None
-                    if isinstance(j, dict):
-                        images = j.get('images') or j.get('result') or None
-                    if images and isinstance(images, list) and len(images) > 0:
-                        url = save_base64_image(images[0], prefix='sd')
-                        if url:
-                            out = {'image': url, 'prompt': prompt}
-                            if debug:
-                                out['sd_response'] = j
-                            return jsonify(out)
+                    # Robust extraction: different SD frontends return images in different shapes.
+                    def extract_base64_images(node):
+                        """Recursively search JSON-like structure for base64 image strings.
+                        Accepts 'data:image/png;base64,...', raw base64, or dict entries like {'b64': '...'}.
+                        Returns list of base64 (possibly with data: header) strings.
+                        """
+                        found = []
+                        if node is None:
+                            return found
+                        if isinstance(node, str):
+                            s = node.strip()
+                            # common header form
+                            if s.startswith('data:image') and 'base64,' in s:
+                                found.append(s)
+                                return found
+                            # raw base64-looking string (heuristic: long and mostly base64 chars)
+                            if len(s) > 800 and all(c.isalnum() or c in '+/=' for c in s[:200]):
+                                # assume it's base64 image - caller will decode
+                                found.append(s)
+                                return found
+                            return found
+                        if isinstance(node, dict):
+                            # common keys
+                            for k in ('images', 'image', 'result', 'outputs', 'artifacts', 'images_base64'):
+                                if k in node:
+                                    return extract_base64_images(node[k])
+                            for v in node.values():
+                                found.extend(extract_base64_images(v))
+                            return found
+                        if isinstance(node, list):
+                            for item in node:
+                                found.extend(extract_base64_images(item))
+                            return found
+                        return found
+
+                    images = extract_base64_images(j)
+                    # helper to extract metadata (seed/steps/sampler) from response
+                    def extract_metadata(node):
+                        md = {}
+                        if not node:
+                            return md
+                        if isinstance(node, dict):
+                            for k in ('seed', 'steps', 'sampler', 'sampler_name', 'seed_value', 'cfg_scale'):
+                                if k in node:
+                                    md[k] = node[k]
+                            # many SD frontends include parameters/info under 'info' or within nested dicts
+                            for v in node.values():
+                                if isinstance(v, (dict, list)):
+                                    nested = extract_metadata(v)
+                                    for kk, vv in nested.items():
+                                        if kk not in md:
+                                            md[kk] = vv
+                        elif isinstance(node, list):
+                            for item in node:
+                                nested = extract_metadata(item)
+                                for kk, vv in nested.items():
+                                    if kk not in md:
+                                        md[kk] = vv
+                        return md
+
+                    if images and len(images) > 0:
+                        result_images = []
+                        meta = extract_metadata(j)
+                        # Save all found images
+                        for idx, img_b64 in enumerate(images):
+                            choice = img_b64
+                            # prefer data:... if present
+                            if isinstance(img_b64, str) and img_b64.startswith('data:'):
+                                choice = img_b64
+                            url = save_base64_image(choice, prefix=f'sd{idx}')
+                            if url:
+                                result_images.append({'url': url, 'index': idx})
+                        out = {'images': result_images, 'prompt': prompt, 'meta': meta}
+                        if debug:
+                            out['sd_response'] = j
+                        return jsonify(out)
                     else:
                         # No images found in response
                         if debug:
-                            return jsonify({'sd_status': r.status_code, 'sd_body': j})
+                            # save debug file to static for offline inspection
+                            dbg_path = save_debug_response(j)
+                            out = {'sd_status': r.status_code, 'sd_body': j}
+                            if dbg_path:
+                                out['sd_debug_file'] = dbg_path
+                            return jsonify(out)
             except Exception as e:
                 print('SD call failed or not available:', e)
                 if data.get('debug'):
-                    return jsonify({'error': str(e)})
+                    dbg_path = save_debug_response({'error': str(e), 'text': str(e)})
+                    out = {'error': str(e)}
+                    if dbg_path:
+                        out['sd_debug_file'] = dbg_path
+                    return jsonify(out)
 
         # Also accept direct base64 image in the request body under 'image'
         incoming_image = data.get('image')
