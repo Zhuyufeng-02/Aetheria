@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="crystal-rose" viewBox="0 0 64 64">
+    <path d="M32 2 L58 24 L44 62 L20 62 L6 24 Z" fill="#f7c6d3" stroke="#d9879a" stroke-width="1"/>
+  </symbol>
+  <symbol id="crystal-amethyst" viewBox="0 0 64 64">
+    <path d="M32 2 L58 24 L44 62 L20 62 L6 24 Z" fill="#c9a9ff" stroke="#9366ff" stroke-width="1"/>
+  </symbol>
+  <symbol id="crystal-citrine" viewBox="0 0 64 64">
+    <path d="M32 2 L58 24 L44 62 L20 62 L6 24 Z" fill="#ffe29a" stroke="#e3b84a" stroke-width="1"/>
+  </symbol>
+  <symbol id="crystal-clear" viewBox="0 0 64 64">
+    <path d="M32 2 L58 24 L44 62 L20 62 L6 24 Z" fill="#e6f7ff" stroke="#a7d6ff" stroke-width="1"/>
+  </symbol>
+</svg>

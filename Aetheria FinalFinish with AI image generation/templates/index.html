@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Aetheria</title>
+    <link rel="icon" href="/static/images/cards/the_fool.svg"/>
+    <link rel="stylesheet" href="/static/style.css"/>
+    <base target="_blank">
+</head>
+<body>
+<!-- 简化背景 - 只使用 backtop.png -->
+<div class="background-simple">
+    <div class="background-overlay"></div>
+</div>
+
+<div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-decor">
+        <svg class="hero-tree" viewBox="0 0 800 520" aria-hidden="true">
+            <g class="wings" transform="translate(400,220)">
+                <path class="wing" d="M-220,0 C-330,-10 -340,-120 -200,-140 C-80,-155 -30,-80 0,-40"/>
+                <path class="wing" d="M220,0 C330,-10 340,-120 200,-140 C80,-155 30,-80 0,-40"/>
+            </g>
+            <g transform="translate(360,260)">
+                <path class="trunk" d="M40,0 C36,40 20,120 40,180 C60,120 64,40 60,0 Z"/>
+            </g>
+            <g class="canopy" transform="translate(400,120)">
+                <circle cx="-60" cy="-10" r="34"/>
+                <circle cx="0" cy="-40" r="48"/>
+                <circle cx="60" cy="-12" r="40"/>
+                <circle cx="-20" cy="30" r="38"/>
+                <circle cx="40" cy="28" r="30"/>
+                <circle cx="110" cy="0" r="22"/>
+                <circle cx="-110" cy="8" r="26"/>
+                <circle cx="10" cy="10" r="28"/>
+                <circle cx="-40" cy="-34" r="20"/>
+                <circle cx="80" cy="-42" r="18"/>
+            </g>
+        </svg>
+
+        <div class="floating rock r1"></div>
+        <div class="floating orb o1"></div>
+        <div class="floating orb o2"></div>
+        <div class="floating petal p1"></div>
+    </div>
+    <header class="hero-header">
+        <h1 class="brand">Aetheria</h1>
+        <p class="tag">Dreamlike fortune & visual card creation</p>
+        <div class="hero-cta">
+            <button id="ctaGenerate" class="primary">Generate a Dream Card</button>
+            <a class="link" href="/generated">Gallery</a>
+        </div>
+    </header>
+</div>
+
+<main class="container glass">
+    <nav class="topnav"><a href="/">Home</a> · <a href="/generated">Gallery</a></nav>
+
+    <!-- 水晶选择部分 -->
+    <section class="crystals">
+        <h2>Choose your inspiration crystal</h2>
+        <div id="crystalList" class="crystal-horizontal-list">
+            <!-- JavaScript会在这里生成水晶选项 -->
+        </div>
+    </section>
+
+    <!-- 水晶球部分 -->
+    <section class="crystal-ball-section">
+        <h2>The Dreamy Crystal Ball</h2>
+        <p class="section-subtitle">Focus on an intention, then choose to generate a visual card from Stable Diffusion
+            or a placeholder art.</p>
+
+        <div class="crystal-ball-container">
+            <div id="crystalBall" class="ball">
+                <div class="glow"></div>
+                <div class="inner-sphere">
+                    <img src="/static/images/crystal-ball.png" alt="Crystal Ball" class="crystal-ball-img">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 占卜和生成区域 -->
+    <section class="reading-section">
+        <h2>Choose a card reading</h2>
+
+        <div class="reading-options">
+            <button class="reading-option active" data-reading="single">Single Card</button>
+            <button class="reading-option" data-reading="three">Three Card</button>
+            <button class="reading-option" data-reading="clear">Clear Card</button>
+        </div>
+
+        <div class="generation-area">
+            <div class="generation-left">
+                <h3>Generate Custom Image</h3>
+                <textarea
+                        id="promptInput"
+                        placeholder="Enter your prompt here..."
+                        rows="3"
+                        class="prompt-textarea"
+                ></textarea>
+            </div>
+
+            <div class="generation-right">
+                <h3>Generate Card Image</h3>
+                <button id="generateBtn" class="generate-main-btn">
+                    Generate Mystical Image
+                </button>
+            </div>
+        </div>
+
+        <!-- 提示词显示区域 -->
+        <div class="prompt-display-area">
+            <strong>Prompt:</strong>
+            <span id="currentPrompt">Your prompt will appear here...</span>
+        </div>
+
+        <div id="readingResult" class="cards-grid"></div>
+
+        <!-- 生成结果预览 -->
+        <div id="generatedPreview" class="generated-preview">
+            <div class="preview-placeholder">
+                <p>Your generated image will appear here</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 聊天区域 -->
+    <section class="chat-section">
+        <h2>Chat with the Fortune Teller</h2>
+        <div id="chatLog" class="chat-log">
+            <div class="chat-message bot-message">
+                <div class="message-bubble">
+                    Welcome to Aetheria! I am your fortune teller. Ask me anything about your future or seek guidance.
+                </div>
+            </div>
+        </div>
+        <div id="typingIndicator" class="typing" style="display: none;">The fortune teller is composing...</div>
+        <form id="chatForm" class="chat-form">
+            <input id="chatInput" placeholder="Ask a question..." autocomplete="off" class="chat-input"/>
+            <button type="submit" class="chat-send">Send</button>
+        </form>
+    </section>
+</main>
+
+<!-- 调试按钮 -->
+<div class="debug-button">
+    <button onclick="quickTest()" class="test-button">
+        🧪 Quick Test
+    </button>
+</div>
+
+<script>
+    // 当前选中的水晶
+    let selectedCrystal = null;
+
+    // 快速测试函数
+    function quickTest() {
+        console.log('🔍 Quick test started...');
+
+        const promptInput = document.getElementById('promptInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const preview = document.getElementById('generatedPreview');
+
+        console.log('promptInput:', promptInput);
+        console.log('generateBtn:', generateBtn);
+        console.log('preview:', preview);
+
+        if (promptInput) {
+            promptInput.value = "A mystical crystal ball with glowing energy and stars";
+            console.log('Set test prompt:', promptInput.value);
+            updatePromptDisplay(promptInput.value);
+        }
+
+        if (generateBtn) {
+            console.log('Generate button is available');
+        }
+
+        // 测试后端连接
+        testBackendConnection();
+    }
+
+    // 测试后端连接
+    async function testBackendConnection() {
+        try {
+            console.log('🔗 Testing backend connection...');
+            const response = await fetch('/api/health');
+            if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Backend is healthy:', data);
+            } else {
+                console.error('❌ Backend health check failed:', response.status);
+            }
+        } catch (error) {
+            console.error('❌ Backend connection failed:', error);
+        }
+    }
+
+    // 模拟图片生成（仅用于演示）
+    function simulateImageGeneration() {
+        const preview = document.getElementById('generatedPreview');
+        if (preview) {
+            preview.innerHTML = `
+                <div class="generated-result">
+                    <h4>Generated Image (Simulation)</h4>
+                    <div class="image-container">
+                        <div class="image-placeholder">
+                            <img src="/static/images/card-back.png" alt="Generated Image" class="generated-image">
+                        </div>
+                    </div>
+                    <div class="image-info">
+                        <p><strong>Prompt:</strong> A mystical crystal ball with glowing energy and stars</p>
+                        <p><strong>Style:</strong> Fantasy Art</p>
+                        <p><strong>Note:</strong> This is a simulation. Click "Generate Mystical Image" for real generation.</p>
+                        <button class="save-image">Save Image</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // 更新提示词显示
+    function updatePromptDisplay(prompt) {
+        const promptDisplay = document.getElementById('currentPrompt');
+        if (promptDisplay) {
+            promptDisplay.textContent = prompt || 'Your prompt will appear here...';
+        }
+    }
+
+    // 页面加载后初始化
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('DOM loaded - initializing...');
+
+        // 初始化水晶选择
+        initializeCrystals();
+
+        // 绑定事件
+        bindEvents();
+
+        // 初始化阅读选项
+        initReadingOptions();
+    });
+
+    // 初始化水晶选择
+    function initializeCrystals() {
+        const crystalList = document.getElementById('crystalList');
+        if (!crystalList) return;
+
+        const crystals = [
+            {name: 'amethyst', color: '#9966CC', emoji: '🔮'},
+            {name: 'emerald', color: '#50C878', emoji: '💚'},
+            {name: 'ruby', color: '#E0115F', emoji: '❤️'},
+            {name: 'sapphire', color: '#0F52BA', emoji: '💙'},
+            {name: 'citrine', color: '#E4D00A', emoji: '💛'}
+        ];
+
+        crystalList.innerHTML = crystals.map(crystal => `
+            <div class="crystal-item" data-crystal="${crystal.name}">
+                <div class="crystal-emoji">${crystal.emoji}</div>
+                <div class="crystal-name">${crystal.name}</div>
+            </div>
+        `).join('');
+
+        // 绑定水晶点击事件
+        document.querySelectorAll('.crystal-item').forEach(item => {
+            item.addEventListener('click', function () {
+                selectCrystal(this.dataset.crystal, this);
+            });
+        });
+
+        // 默认选择第一个水晶
+        if (crystals.length > 0) {
+            const firstCrystal = document.querySelector('.crystal-item');
+            if (firstCrystal) {
+                selectCrystal(crystals[0].name, firstCrystal);
+            }
+        }
+    }
+
+    // 初始化阅读选项
+    function initReadingOptions() {
+        const options = document.querySelectorAll('.reading-option');
+        options.forEach(option => {
+            option.addEventListener('click', function () {
+                options.forEach(opt => opt.classList.remove('active'));
+                this.classList.add('active');
+
+                // 根据选择的阅读类型绘制卡片
+                const readingType = this.dataset.reading;
+                drawCards(readingType);
+            });
+        });
+
+        // 默认绘制单张卡片
+        drawCards('single');
+    }
+
+    // 选择水晶
+    function selectCrystal(crystalName, element) {
+        document.querySelectorAll('.crystal-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        element.classList.add('selected');
+        selectedCrystal = crystalName;
+        console.log('Selected crystal:', crystalName);
+    }
+
+    // 绘制卡片
+    function drawCards(readingType) {
+        const readingResult = document.getElementById('readingResult');
+        if (!readingResult) return;
+
+        let cardCount = 1;
+        if (readingType === 'three') cardCount = 3;
+        if (readingType === 'clear') {
+            readingResult.innerHTML = '';
+            return;
+        }
+
+        // 模拟卡片数据
+        const cards = [
+            {name: 'The Fool', description: 'New beginnings, innocence, spontaneity'},
+            {name: 'The Magician', description: 'Manifestation, resourcefulness, power'},
+            {name: 'The High Priestess', description: 'Intuition, unconscious knowledge, divine feminine'},
+            {name: 'The Empress', description: 'Femininity, beauty, nature, abundance'},
+            {name: 'The Emperor', description: 'Authority, structure, control, fatherhood'}
+        ];
+
+        let cardsHTML = '';
+        for (let i = 0; i < cardCount; i++) {
+            const card = cards[i % cards.length];
+            cardsHTML += `
+                <div class="card">
+                    <div class="card-inner">
+                        <div class="card-front">
+                            <div class="card-symbol">${getCardSymbol(card.name)}</div>
+                            <div class="card-title">${card.name}</div>
+                            <div class="card-description">${card.description}</div>
+                            <button class="generate-from-card" data-prompt="${card.name} tarot card in fantasy style">Generate Image</button>
+                        </div>
+                        <div class="card-back">
+                            <!-- 使用现有的card-back.png图片 -->
+                            <div class="card-back-content"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        readingResult.innerHTML = cardsHTML;
+
+        // 绑定生成卡片图片事件
+        document.querySelectorAll('.generate-from-card').forEach(button => {
+            button.addEventListener('click', function () {
+                const prompt = this.dataset.prompt;
+                document.getElementById('promptInput').value = prompt;
+                updatePromptDisplay(prompt);
+            });
+        });
+    }
+
+    // 获取卡片符号
+    function getCardSymbol(cardName) {
+        const symbols = {
+            'The Fool': '🃏',
+            'The Magician': '🪄',
+            'The High Priestess': '🌙',
+            'The Empress': '👑',
+            'The Emperor': '⚜️'
+        };
+        return symbols[cardName] || '🃏';
+    }
+
+    // 绑定事件
+    function bindEvents() {
+        const generateBtn = document.getElementById('generateBtn');
+        const chatForm = document.getElementById('chatForm');
+        const ctaGenerate = document.getElementById('ctaGenerate');
+        const promptInput = document.getElementById('promptInput');
+
+        if (generateBtn) generateBtn.addEventListener('click', generateImage);
+        if (chatForm) chatForm.addEventListener('submit', sendChatMessage);
+        if (ctaGenerate) ctaGenerate.addEventListener('click', quickGenerate);
+
+        // 实时更新提示词显示
+        if (promptInput) {
+            promptInput.addEventListener('input', function () {
+                updatePromptDisplay(this.value);
+            });
+        }
+    }
+
+    // 生成图片 - 实际调用后端API
+    async function generateImage() {
+        const promptInput = document.getElementById('promptInput');
+        const preview = document.getElementById('generatedPreview');
+        const generateBtn = document.getElementById('generateBtn');
+
+        if (!promptInput || !preview || !generateBtn) return;
+
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+            alert('Please enter a prompt first!');
+            return;
+        }
+
+        console.log('🎨 Starting image generation with prompt:', prompt);
+        console.log('💎 Selected crystal:', selectedCrystal);
+
+        // 禁用按钮防止重复点击
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Generating...';
+
+        // 显示加载状态
+        showLoadingState(preview, prompt);
+
+        try {
+            // 调用后端API
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    crystal: selectedCrystal,
+                    width: 512,
+                    height: 768
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('📦 API response:', data);
+
+            if (data.success) {
+                showGeneratedResult(data, prompt);
+            } else {
+                showError(`Generation failed: ${data.note || 'Unknown error'}`);
+            }
+
+        } catch (error) {
+            console.error('❌ Generation error:', error);
+            showError(`Network error: ${error.message}`);
+        } finally {
+            // 重新启用按钮
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Mystical Image';
+        }
+    }
+
+    // 显示加载状态
+    function showLoadingState(container, prompt) {
+        container.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>✨ Generating your mystical image...</p>
+                <p class="loading-note">This may take a few moments</p>
+                <div class="debug-info">
+                    <p><strong>Prompt:</strong> "${prompt}"</p>
+                    <p><strong>Crystal:</strong> ${selectedCrystal || 'None'}</p>
+                    <p><strong>Started:</strong> ${new Date().toLocaleTimeString()}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    // 显示生成结果
+    function showGeneratedResult(data, prompt) {
+        const preview = document.getElementById('generatedPreview');
+
+        // 添加时间戳确保图片重新加载
+        const timestamp = new Date().getTime();
+        const imageUrl = data.image + (data.image.includes('?') ? '&' : '?') + 't=' + timestamp;
+
+        preview.innerHTML = `
+            <div class="generated-result">
+                <div class="success-header">
+                    <h4>✨ Generation Successful! ✨</h4>
+                    <div class="success-badge">✅</div>
+                </div>
+
+                <div class="image-container">
+                    <div class="generated-image-wrapper">
+                        <img src="${imageUrl}" alt="Generated Image" class="generated-image new-image"
+                             onerror="this.src='/static/images/card-back.png'">
+                        <div class="image-overlay">
+                            <span class="overlay-text">NEW</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="image-info">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <strong>Prompt:</strong> ${prompt}
+                        </div>
+                        <div class="info-item">
+                            <strong>Crystal:</strong> ${selectedCrystal || 'Default'}
+                        </div>
+                        <div class="info-item">
+                            <strong>Type:</strong> ${data.type || 'PIL Generated'}
+                        </div>
+                        <div class="info-item">
+                            <strong>Time:</strong> ${new Date().toLocaleString()}
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="save-image" onclick="saveImage('${data.image}')">💾 Save to Gallery</button>
+                        <button class="generate-again" onclick="generateImage()">🔄 Generate Again</button>
+                        <button class="view-gallery" onclick="window.location.href='/generated'">📁 View Gallery</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 添加新图片的高亮效果
+        const newImage = preview.querySelector('.new-image');
+        if (newImage) {
+            newImage.style.animation = 'highlight 2s ease-in-out';
+            setTimeout(() => {
+                newImage.style.animation = '';
+            }, 2000);
+        }
+
+        console.log('🖼️ Image displayed successfully');
+    }
+
+    // 显示错误信息
+    function showError(message) {
+        const preview = document.getElementById('generatedPreview');
+        preview.innerHTML = `
+            <div class="error-state">
+                <div class="error-icon">❌</div>
+                <h4>Generation Failed</h4>
+                <p class="error-message">${message}</p>
+                <div class="error-actions">
+                    <button class="retry-btn" onclick="generateImage()">🔄 Retry</button>
+                    <button class="debug-btn" onclick="testBackendConnection()">🐛 Debug</button>
+                    <button class="help-btn" onclick="showHelp()">❓ Help</button>
+                </div>
+                <div class="error-tips">
+                    <p><strong>Tips:</strong></p>
+                    <ul>
+                        <li>Check your internet connection</li>
+                        <li>Try a different prompt</li>
+                        <li>Make sure the server is running</li>
+                        <li>Check browser console for details (F12)</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+
+    // 发送聊天消息
+    function sendChatMessage(e) {
+        e.preventDefault();
+        const chatInput = document.getElementById('chatInput');
+        const chatLog = document.getElementById('chatLog');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        if (!chatInput || !chatLog) return;
+
+        const message = chatInput.value.trim();
+        if (!message) return;
+
+        // 添加用户消息
+        const userMessage = document.createElement('div');
+        userMessage.className = 'chat-message user-message';
+        userMessage.innerHTML = `<div class="message-bubble">${message}</div>`;
+        chatLog.appendChild(userMessage);
+
+        // 清空输入框
+        chatInput.value = '';
+
+        // 显示输入指示器
+        if (typingIndicator) {
+            typingIndicator.style.display = 'block';
+        }
+
+        // 滚动到底部
+        chatLog.scrollTop = chatLog.scrollHeight;
+
+        // 调用后端聊天API
+        sendChatToAPI(message, chatLog, typingIndicator);
+    }
+
+    // 调用后端聊天API
+    async function sendChatToAPI(message, chatLog, typingIndicator) {
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    crystal: selectedCrystal
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // 隐藏输入指示器
+            if (typingIndicator) {
+                typingIndicator.style.display = 'none';
+            }
+
+            // 添加AI响应
+            const botMessage = document.createElement('div');
+            botMessage.className = 'chat-message bot-message';
+            botMessage.innerHTML = `<div class="message-bubble">${data.reply}</div>`;
+            chatLog.appendChild(botMessage);
+
+            // 滚动到底部
+            chatLog.scrollTop = chatLog.scrollHeight;
+
+        } catch (error) {
+            console.error('Chat API error:', error);
+
+            // 隐藏输入指示器
+            if (typingIndicator) {
+                typingIndicator.style.display = 'none';
+            }
+
+            // 添加错误响应
+            const botMessage = document.createElement('div');
+            botMessage.className = 'chat-message bot-message';
+            botMessage.innerHTML = `<div class="message-bubble">I apologize, but I'm having trouble connecting right now. Please try again later.</div>`;
+            chatLog.appendChild(botMessage);
+
+            // 滚动到底部
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+    }
+
+    // 快速生成
+    function quickGenerate() {
+        const prompts = [
+            "A mystical tarot card with moon and stars",
+            "The Fool tarot card in fantasy style",
+            "Magician tarot card with glowing symbols",
+            "A beautiful High Priestess tarot card",
+            "Fantasy crystal ball with magical energy",
+            "Mystical crystal with glowing energy",
+            "Ancient tarot card with mysterious symbols",
+            "Crystal ball vision of the future"
+        ];
+
+        const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+        document.getElementById('promptInput').value = randomPrompt;
+        updatePromptDisplay(randomPrompt);
+
+        // 自动生成图片
+        setTimeout(() => {
+            generateImage();
+        }, 500);
+    }
+
+    // 保存图片
+    function saveImage(imageUrl) {
+        // 这里可以实现保存到本地或收藏夹的功能
+        console.log('Saving image:', imageUrl);
+
+        // 模拟保存操作
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = 'aetheria-generated-image.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // 显示保存成功消息
+        alert('Image saved successfully!');
+    }
+
+    // 显示帮助信息
+    function showHelp() {
+        alert(`Aetheria Image Generation Help:
+
+1. Enter a prompt describing the image you want
+2. Select a crystal for inspiration (optional)
+3. Click "Generate Mystical Image"
+4. Wait for the AI to create your image
+5. Save or regenerate as needed
+
+Common prompts that work well:
+- "Mystical crystal ball with glowing energy"
+- "Fantasy tarot card with moon and stars"
+- "Ancient magical symbols"
+- "Cosmic vision of the future"`);
+    }
+</script>
+
+<style>
+    /* 添加新样式 */
+    .success-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 1rem;
+    }
+
+    .success-badge {
+        font-size: 2rem;
+        animation: bounce 1s infinite;
+    }
+
+    @keyframes bounce {
+        0%, 100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @keyframes highlight {
+        0% {
+            box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 0 20px rgba(255, 215, 0, 0);
+            transform: scale(1.05);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+            transform: scale(1);
+        }
+    }
+
+    .generated-image-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+
+    .image-overlay {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: linear-gradient(135deg, #ff6b6b, #ffd93d);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 12px;
+        font-weight: bold;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 1rem;
+    }
+
+    .info-item {
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .save-image, .generate-again, .view-gallery,
+    .retry-btn, .debug-btn, .help-btn {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+
+    .save-image, .view-gallery {
+        background: linear-gradient(135deg, #4ECDC4, #44A08D);
+        color: white;
+    }
+
+    .generate-again, .retry-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+
+    .debug-btn {
+        background: linear-gradient(135deg, #ff9800, #ff5722);
+        color: white;
+    }
+
+    .help-btn {
+        background: linear-gradient(135deg, #9c27b0, #673ab7);
+        color: white;
+    }
+
+    .error-state {
+        text-align: center;
+        padding: 2rem;
+        background: rgba(244, 67, 54, 0.1);
+        border-radius: 15px;
+        border: 1px solid rgba(244, 67, 54, 0.3);
+    }
+
+    .error-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .error-message {
+        color: #f44336;
+        margin-bottom: 1.5rem;
+        font-size: 16px;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .error-tips {
+        text-align: left;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 10px;
+        font-size: 14px;
+    }
+
+    .error-tips ul {
+        margin: 10px 0 0 0;
+        padding-left: 20px;
+    }
+
+    .error-tips li {
+        margin-bottom: 5px;
+    }
+
+    .debug-info {
+        margin-top: 15px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        font-size: 12px;
+        text-align: left;
+    }
+
+    .debug-info p {
+        margin: 5px 0;
+    }
+</style>
+</body>
+</html>

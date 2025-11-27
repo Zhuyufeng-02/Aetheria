@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Aetheria — Gallery</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Generated Gallery</h1>
+      <nav class="topnav"><a href="/">Home</a> · <a href="/generated">Gallery</a></nav>
+
+      <div id="gallery" class="generated-preview"></div>
+    </div>
+    <script>
+      async function loadGallery(){
+        const res = await fetch('/api/generated')
+        const j = await res.json()
+        const g = document.getElementById('gallery')
+        g.innerHTML=''
+          j.items.forEach(it=>{
+            const wrap = document.createElement('div')
+            wrap.className='gallery-item'
+            const img = document.createElement('img')
+            img.src = it.image
+            img.alt = it.prompt || 'generated'
+            img.onclick = ()=> window.showModal(it.image, it.prompt||'', it.id)
+            const meta = document.createElement('div')
+            meta.className='meta'
+            meta.innerHTML = `<div><strong>${it.prompt||''}</strong></div><div class="muted">${it.created_at||''} · ${it.crystal||''}</div>`
+            const del = document.createElement('button')
+            del.textContent='Delete'
+            del.onclick = async ()=>{
+              if(!confirm('Delete this image?')) return
+              const r = await fetch('/api/generated/'+it.id, {method:'DELETE'})
+              if(r.ok) loadGallery()
+            }
+            wrap.appendChild(img)
+            wrap.appendChild(meta)
+            wrap.appendChild(del)
+            g.appendChild(wrap)
+          })
+      }
+      document.addEventListener('DOMContentLoaded', loadGallery)
+    </script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
